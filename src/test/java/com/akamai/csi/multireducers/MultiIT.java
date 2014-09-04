@@ -1,14 +1,15 @@
 package com.akamai.csi.multireducers;
 
 import com.akamai.csi.multireducers.example.ExampleRunner;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.HashMultiset;
+import com.google.common.collect.ImmutableMultiset;
+import com.google.common.collect.Multiset;
 import com.google.common.io.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.mapred.ClusterMapReduceTestCase;
 import org.apache.hadoop.mapred.JobConf;
-import org.hamcrest.CoreMatchers;
 
 import java.io.File;
 import java.io.IOException;
@@ -16,7 +17,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URL;
 import java.util.EnumSet;
-import java.util.Map;
 import java.util.Properties;
 
 import static org.hamcrest.core.Is.is;
@@ -44,6 +44,7 @@ public class MultiIT extends ClusterMapReduceTestCase {
 
         ExampleRunner exampleRunner = new ExampleRunner();
         JobConf conf = createJobConf();
+        conf.setNumReduceTasks(10);
         exampleRunner.setConf(conf);
         final FileContext fc = FileContext.getFileContext(conf);
 
@@ -56,38 +57,38 @@ public class MultiIT extends ClusterMapReduceTestCase {
                 is(0));
         RemoteIterator<FileStatus> it = fc.listStatus(new Path(getOutputDir(), "output"));
 
-        Map<String, Integer> countFirst = null;
-        Map<String, Integer> countSecond = null;
+        Multiset<String> countFirst = HashMultiset.create();
+        Multiset<String> countSecond = HashMultiset.create();
 
         while (it.hasNext()) {
             final Path path = it.next().getPath();
-            Map<String, Integer> map = MultiJobTest.toMap(new InputSupplier<InputStream>() {
+            Multiset<String> map = MultiJobTest.toMap(new InputSupplier<InputStream>() {
                 @Override
                 public InputStream getInput() throws IOException {
                     return fc.open(path);
                 }
             });
             if (path.getName().startsWith("CountFirst")) {
-                countFirst = map;
+                countFirst.addAll(map);
             }
             if (path.getName().startsWith("CountSecond")) {
-                countSecond = map;
+                countSecond.addAll(map);
             }
         }
         assertThat(countFirst, notNullValue());
         assertThat(countSecond, notNullValue());
         assert(countFirst != null && countSecond != null);
 
-        assertThat(ImmutableMap.copyOf(countFirst), CoreMatchers.is(ImmutableMap.of(
-                "john", 2*times,
-                "dough", times,
-                "joe", times,
-                "moe", times)));
-        assertThat(ImmutableMap.copyOf(countSecond), CoreMatchers.is(ImmutableMap.of(
-                "120", times,
-                "130", 2*times,
-                "180", times,
-                "190", times)));
+        assertThat(ImmutableMultiset.copyOf(countFirst), is(new ImmutableMultiset.Builder<String>().
+                addCopies("john", 2 * times).
+                addCopies("dough", times).
+                addCopies("joe", times).
+                addCopies("moe", times).build()));
+        assertThat(ImmutableMultiset.copyOf(countSecond), is(new ImmutableMultiset.Builder<String>().
+                addCopies("120", times).
+                addCopies("130", 2*times).
+                addCopies("180", times).
+                addCopies("190", times).build()));
     }
 
     private void createInputFile(OutputStream out, int times) throws IOException {

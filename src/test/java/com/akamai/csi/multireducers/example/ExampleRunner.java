@@ -49,15 +49,16 @@ public class ExampleRunner extends Configured implements Tool {
     @Override
     public int run(String[] args) throws Exception {
         Job job = new Job(getConf(), "ExampleMultiRunner");
+        int numReduceTasks = job.getNumReduceTasks();
         MultiJob.create().
                 withMapper(SelectFirstField.class, Text.class, IntWritable.class).
-                withReducer(CountFirstField.class, 1).
+                withReducer(CountFirstField.class, numReduceTasks).
                 withCombiner(CountFirstField.class).
                 withOutputFormat(TextOutputFormat.class, Text.class, IntWritable.class).
                 addTo(job);
         MultiJob.create().
                 withMapper(SelectSecondField.class, IntWritableInRange.class, IntWritable.class).
-                withReducer(CountSecondField.class, 1).
+                withReducer(CountSecondField.class, numReduceTasks).
                 withCombiner(CountSecondField.class).
                 withOutputFormat(TextOutputFormat.class, Text.class, IntWritable.class).
                 addTo(job);

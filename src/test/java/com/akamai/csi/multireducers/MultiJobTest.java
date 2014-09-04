@@ -1,8 +1,9 @@
 package com.akamai.csi.multireducers;
 
 import com.akamai.csi.multireducers.example.*;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
+import com.google.common.collect.HashMultiset;
+import com.google.common.collect.ImmutableMultiset;
+import com.google.common.collect.Multiset;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
 import com.google.common.io.InputSupplier;
@@ -24,7 +25,6 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.Map;
 import java.util.Scanner;
 
 import static org.hamcrest.CoreMatchers.is;
@@ -141,29 +141,29 @@ public class MultiJobTest {
         assertThat(firstFieldFiles[0].length(), greaterThan(0l));
         assertThat(secondFieldFiles.length, is(1));
         assertThat(secondFieldFiles[0].length(), greaterThan(0l));
-        Map<String, Integer> countFirstField = toMap(Files.newInputStreamSupplier(firstFieldFiles[0]));
-        Map<String, Integer> countSecondField = toMap(Files.newInputStreamSupplier(secondFieldFiles[0]));
-        assertThat(ImmutableMap.copyOf(countFirstField), is(ImmutableMap.of(
-                "john", 2,
-                "dough", 1,
-                "joe", 1,
-                "moe", 1)));
-        assertThat(ImmutableMap.copyOf(countSecondField), is(ImmutableMap.of(
-                "120", 1,
-                "130", 2,
-                "180", 1,
-                "190", 1)));
+        Multiset<String> countFirstField = toMap(Files.newInputStreamSupplier(firstFieldFiles[0]));
+        Multiset<String> countSecondField = toMap(Files.newInputStreamSupplier(secondFieldFiles[0]));
+        assertThat(ImmutableMultiset.copyOf(countFirstField), is(new ImmutableMultiset.Builder<String>()
+                .addCopies("john", 2)
+                .add("dough")
+                .add("joe")
+                .add("moe").build()));
+        assertThat(ImmutableMultiset.copyOf(countSecondField), is(new ImmutableMultiset.Builder<String>()
+                .add("120")
+                .addCopies("130", 2)
+                .add("180")
+                .add("190").build()));
     }
 
-    public static Map<String, Integer> toMap(InputSupplier<? extends InputStream> supplier) throws IOException {
+    public static Multiset<String> toMap(InputSupplier<? extends InputStream> supplier) throws IOException {
         InputStream input = supplier.getInput();
         try {
             Scanner scanner = new Scanner(input);
-            Map<String, Integer> m = Maps.newHashMap();
+            Multiset<String> m = HashMultiset.create();
             while (scanner.hasNext()) {
                 String line = scanner.nextLine();
                 String[] parts = line.split("\t");
-                m.put(parts[0], Integer.parseInt(parts[1]));
+                m.add(parts[0], Integer.parseInt(parts[1]));
             }
             return m;
         } finally {
