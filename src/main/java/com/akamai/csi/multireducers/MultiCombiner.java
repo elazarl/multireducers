@@ -7,7 +7,9 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * MultiCombiner would run the combiner on
+ * MultiCombiner would run the defined combiner for each mapper. If no combiner is defined
+ * for this particular class - it'll simply forward the values.
+ * If no mapper have any combiner defined - no combiner would run for the job.
  */
 public class MultiCombiner extends MultiReducer<PerMapperOutputKey, PerMapperOutputValue> {
     public static final String CONF_KEY = "com.akamai.csi.multireducers.combiners";

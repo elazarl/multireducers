@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * MultiPartitioner would work on PerReducerWritable, and use the relevant internal partitioner
+ * MultiPartitioner would work on PerMapperOutputKey/Value, and use the relevant internal partitioner
  */
 public class MultiPartitioner<T> extends Partitioner<PerMapperOutputKey, T>
     implements Configurable {

@@ -1,7 +1,8 @@
 package com.akamai.csi.multireducers;
 
 /**
- * PerMapperOutputValue keeps value per mapper.
+ * PerMapperOutputValue would contain a mapper output value, and a byte
+ * specifying to which reducer should this writable reach.
  * TODO(elazar): remove that, and have MR record reader understand that from the key
  */
 public class PerMapperOutputValue extends PerInternalMapper {

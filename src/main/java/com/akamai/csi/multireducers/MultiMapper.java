@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * MultiMapper would run multiple mappers job, each with its own reducer.
+ * MultiMapper would run multiple mappers job, each with its own mapper.
  */
 public class MultiMapper<KEYIN, VALUEIN> extends Mapper<KEYIN, VALUEIN, PerMapperOutputKey, PerMapperOutputValue> {
 

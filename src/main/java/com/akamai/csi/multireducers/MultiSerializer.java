@@ -14,7 +14,7 @@ import java.io.*;
 import java.util.Collection;
 
 /**
- * MultiSerializer serializes PerReducerData
+ * MultiSerializer serializes PerMapperOutputValue and PerMapperOutputKey
  */
 public class MultiSerializer implements Serialization<PerInternalMapper>, Configurable {
 

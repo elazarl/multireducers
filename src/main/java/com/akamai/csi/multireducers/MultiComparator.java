@@ -11,7 +11,8 @@ import org.apache.hadoop.util.ReflectionUtils;
 import java.io.IOException;
 
 /**
- * Compares PerInternalMapper keys
+ * Compares PerMapperOutputKey keys according to their defined comparator, or using
+ * the default RawComparator if nothing is defined.
  */
 public class MultiComparator implements RawComparator<PerInternalMapper>, Configurable{
     public static final String CONF_KEY = "com.akamai.csi.multireducers.comparators";
