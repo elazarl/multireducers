@@ -125,13 +125,13 @@ public class MultiJob {
         // return exception, or null if all is well
         private RuntimeException reduceMethodNotSoundError(String who, Class<?> clazz, Method reduce) {
             Class<?> key = reduce.getParameterTypes()[0];
-            if (!mapperOutputKey.isAssignableFrom(key)) {
+            if (!key.isAssignableFrom(mapperOutputKey)) {
                 return new IllegalArgumentException("Map output key " + mapperOutputKey.getName() +
                         ", but " + who + " " + clazz.getName() + " expects " + key.getName() + " and it cannot be assigned");
             }
             Type reduceIterator = reduce.getGenericParameterTypes()[1];
             Class<?> iteratorParameter = getTypeParameter(reduceIterator);
-            if (!mapperOutputValue.isAssignableFrom(iteratorParameter)) {
+            if (!iteratorParameter.isAssignableFrom(mapperOutputValue)) {
                 return new IllegalArgumentException("Map output value " + mapperOutputValue.getName() +
                         ", but " + who + " " + clazz.getName() + " expects " + iteratorParameter.getName() +
                         " and it cannot be assigned");
