@@ -131,7 +131,7 @@ public class MultiJob {
             }
             Type reduceIterator = reduce.getGenericParameterTypes()[1];
             Class<?> iteratorParameter = getTypeParameter(reduceIterator);
-            if (!iteratorParameter.isAssignableFrom(mapperOutputValue)) {
+            if (iteratorParameter != null && !iteratorParameter.isAssignableFrom(mapperOutputValue)) {
                 return new IllegalArgumentException("Map output value " + mapperOutputValue.getName() +
                         ", but " + who + " " + clazz.getName() + " expects " + iteratorParameter.getName() +
                         " and it cannot be assigned");
