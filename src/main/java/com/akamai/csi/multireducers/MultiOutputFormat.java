@@ -1,37 +1,60 @@
 package com.akamai.csi.multireducers;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.*;
 import org.apache.hadoop.util.ReflectionUtils;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 public class MultiOutputFormat<V> extends OutputFormat<PerReducerOutputKey, V> implements Configurable {
 
     private static final String MULTI_OUTPUT_FORMATS = "com.akamai.csi.multireducers.output.formats";
 
     private OutputFormat[] outputFormats;
-    private List<String> outputPaths;
+    private List<Map<String, String>> outputProperties;
 
-    public static void addOutputFormat(Job job,Class<? extends OutputFormat> outputFormat, String outputPath) {
+    public static class Property {
+        private final String key;
+        private final String value;
+
+        public Property(String key, String value) {
+            this.key = key;
+            this.value = value;
+        }
+    }
+
+    public static Property outputPath(String path) {
+        return new Property("mapred.output.dir", path);
+    }
+
+    public static Property outputBaseName(String baseName) {
+        return new Property("mapreduce.output.basename", baseName);
+    }
+
+    private static Map<String, String> propertiesToMap(Property... properties) {
+        Map<String, String> m = Maps.newHashMap();
+        for (Property property : properties) {
+            m.put(property.key, property.value);
+        }
+        return m;
+    }
+
+    public static void addOutputFormat(Job job,Class<? extends OutputFormat> outputFormat,
+                                       Property... properties) {
         List<String> outputFormats = Lists.newArrayList(
                 job.getConfiguration().getTrimmedStringCollection(MULTI_OUTPUT_FORMATS));
         outputFormats.add(outputFormat.getName());
         job.getConfiguration().setStrings(MULTI_OUTPUT_FORMATS, outputFormats.toArray(
                 new String[outputFormats.size()]));
         List<String> outputPaths = Lists.newArrayList(
-                job.getConfiguration().getTrimmedStringCollection(MultiJob.OUTPUT_FORMAT_PATH));
-        outputPaths.add(outputPath);
-        job.getConfiguration().setStrings(MultiJob.OUTPUT_FORMAT_PATH,
+                job.getConfiguration().getTrimmedStringCollection(MultiJob.OUTPUT_FORMAT_PROPERTIES));
+        outputPaths.add(MapToProperties.serialize(propertiesToMap(properties)));
+        job.getConfiguration().setStrings(MultiJob.OUTPUT_FORMAT_PROPERTIES,
                 outputPaths.toArray(new String[outputPaths.size()]));
-    }
-
-    public static void addOutputFormat(Job job, Class<? extends OutputFormat> outputFormat) {
-        addOutputFormat(job, outputFormat, MultiJob.NOPATH);
     }
 
     @Override
@@ -92,21 +115,24 @@ public class MultiOutputFormat<V> extends OutputFormat<PerReducerOutputKey, V> i
         return new MultiOutputCommitter(Arrays.asList(committers));
     }
 
-    private String prev;
+    private Map<String, String> prev = Maps.newHashMap();
 
     private void popConfiguration(int i, JobContext context) throws IOException {
-        if (outputPaths.get(i).equals(MultiJob.NOPATH)) return;
-        if (prev == null) {
-            context.getConfiguration().unset("mapred.output.dir");
-        } else {
-            context.getConfiguration().set("mapred.output.dir", prev);
+        for (String key : outputProperties.get(i).keySet()) {
+            if (prev.get(key) == null) {
+                context.getConfiguration().unset(key);
+            } else {
+                context.getConfiguration().set(key, prev.get(key));
+            }
         }
+        prev.clear();
     }
 
     private void pushConfiguration(int i, JobContext context) throws IOException {
-        if (outputPaths.get(i).equals(MultiJob.NOPATH)) return;
-        prev = context.getConfiguration().get("mapred.output.dir");
-        context.getConfiguration().set("mapred.output.dir", outputPaths.get(i));
+        for (Map.Entry<String, String> entry : outputProperties.get(i).entrySet()) {
+            prev.put(entry.getKey(), context.getConfiguration().get(entry.getKey()));
+            context.getConfiguration().set(entry.getKey(), entry.getValue());
+        }
     }
 
     private Configuration conf;
@@ -115,7 +141,12 @@ public class MultiOutputFormat<V> extends OutputFormat<PerReducerOutputKey, V> i
     public void setConf(Configuration conf) {
         this.conf = conf;
         Class<?>[] outputFormatClasses = conf.getClasses(MULTI_OUTPUT_FORMATS);
-        outputPaths = Lists.newArrayList(conf.getTrimmedStringCollection(MultiJob.OUTPUT_FORMAT_PATH));
+        List<String> serializedProperties = Lists.newArrayList(
+                conf.getTrimmedStringCollection(MultiJob.OUTPUT_FORMAT_PROPERTIES));
+        outputProperties = Lists.newArrayList();
+        for (String serializedProperty : serializedProperties) {
+            outputProperties.add(MapToProperties.deserialize(serializedProperty));
+        }
         outputFormats = new OutputFormat[outputFormatClasses.length];
         for (int i = 0; i < outputFormatClasses.length; i++) {
             outputFormats[i] =

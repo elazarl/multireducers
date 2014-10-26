@@ -1,5 +1,6 @@
 package com.akamai.csi.multireducers;
 
+import com.google.common.collect.Lists;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.RawComparator;
@@ -12,10 +13,7 @@ import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 
 /**
  * MultiJob is a helper class that helps you configure a multiplexed job.
@@ -24,16 +22,27 @@ public class MultiJob {
 
     public static final String MULTIREDUCERS_HAVE_OUTPUT_FORMAT = "com.akamai.csi.multireducers.have.output.format";
     public static final String OUTPUT_FORMAT_PATH = "com.akamai.csi.multireducers.outputFormatPath";
+    public static final String OUTPUT_FORMAT_PROPERTIES = "com.akamai.csi.multireducers.outputFormat.properties";
     public static final String NOPATH = "?nopath";
     public static final String DISABLE_JOB_PREFIX = "com.akamai.csi.multireducers.disable.job.";
+    public static final String DISABLE_JOB_BY_INDEX_PREFIX = "com.akamai.csi.multireducers.disable.job.index.";
 
     static public MultiJobBuilder create() {
         return new MultiJobBuilder();
     }
+    static public MultiJobBuilder createWithId(String id) {
+        return new MultiJobBuilder(id);
+    }
 
     static public class MultiJobBuilder {
+        private String id = "~always.disabled~";
 
         private MultiJobBuilder(){}
+
+        private MultiJobBuilder(String id) {
+            this.id = id;
+        }
+
         private boolean skipVerification = false;
         private Class<? extends Mapper> mapper = Mapper.class;
         private Class<?> mapperOutputKey;
@@ -46,7 +55,7 @@ public class MultiJob {
         private Class<?> outputFormatKey = NullWritable.class;
         private Class<?> outputFormatValue = NullWritable.class;
         private Class<? extends RawComparator> comparator = MultiComparator.NoComparator.class;
-        private String outputFormatPath;
+        private List<MultiOutputFormat.Property> outputFormatProperties = Lists.newArrayList();
 
         public MultiJobBuilder skipJobVerificationCanCauseRuntimeErrorsIKnowWhatImDoing() {
             this.skipVerification = true;
@@ -84,29 +93,28 @@ public class MultiJob {
         public MultiJobBuilder withOutputFormat(Class<? extends OutputFormat> outputFormat,
                                                 Class<?> outputFormatKey,
                                                 Class<?> outputFormatValue,
-                                                String outputPath) {
+                                                MultiOutputFormat.Property... properties) {
             this.outputFormat = outputFormat;
             this.outputFormatKey = outputFormatKey;
             this.outputFormatValue = outputFormatValue;
-            this.outputFormatPath = outputPath;
+            Collections.addAll(this.outputFormatProperties, properties);
             return this;
         }
 
-        public MultiJobBuilder withOutputFormat(Class<? extends OutputFormat> outputFormat,
-                                                Class<?> outputFormatKey,
-                                                Class<?> outputFormatValue) {
-            return withOutputFormat(outputFormat, outputFormatKey, outputFormatValue, NOPATH);
-        }
-
         public boolean addTo(Job job) {
-            if (job.getConfiguration().getBoolean(DISABLE_JOB_PREFIX + reducer.getName(), false)) {
+            int jobIndex = job.getConfiguration().getStringCollection(MultiMapper.CONF_KEY).size();
+            if (job.getConfiguration().getBoolean(DISABLE_JOB_PREFIX + reducer.getName(), false) ||
+                job.getConfiguration().getBoolean(DISABLE_JOB_PREFIX + mapper.getName(), false) ||
+                job.getConfiguration().getBoolean(DISABLE_JOB_BY_INDEX_PREFIX + jobIndex, false) ||
+                job.getConfiguration().getBoolean(DISABLE_JOB_PREFIX + id, false)) {
                 return false;
             }
             if (!outputFormat.equals(NullOutputFormat.class)) {
                 job.getConfiguration().setBoolean(MULTIREDUCERS_HAVE_OUTPUT_FORMAT, true);
             }
             verifyJobIsSound();
-            MultiOutputFormat.addOutputFormat(job, outputFormat, outputFormatPath);
+            MultiOutputFormat.addOutputFormat(job, outputFormat, outputFormatProperties.toArray(
+                    new MultiOutputFormat.Property[outputFormatProperties.size()]));
             appendTo(job, MultiMapper.CONF_KEY, mapper);
             appendTo(job, MultiReducer.CONF_KEY, reducer);
             appendTo(job, MultiPartitioner.NUM_REDUCERS_KEY, numReducers);
@@ -115,6 +123,7 @@ public class MultiJob {
             appendTo(job, MultiReducer.INPUT_KEY_CLASSES, mapperOutputKey);
             appendTo(job, MultiReducer.INPUT_VALUE_CLASSES, mapperOutputValue);
             appendTo(job, MultiComparator.CONF_KEY, comparator);
+
             ensureJobSet(job);
             return true;
         }
@@ -226,14 +235,13 @@ public class MultiJob {
         } else {
             job.setOutputFormatClass(NullOutputFormat.class);
         }
-        job.setOutputFormatClass(TextOutputFormat.class);
+        job.setOutputFormatClass(MultiOutputFormat.class);
         job.setReducerClass(MultiReducer.class);
         job.setMapperClass(MultiMapper.class);
         job.setMapOutputKeyClass(PerMapperOutputKey.class);
         job.setMapOutputValueClass(PerMapperOutputValue.class);
         job.setSortComparatorClass(MultiComparator.class);
         job.setPartitionerClass(MultiPartitioner.class);
-        job.setOutputFormatClass(MultiOutputFormat.class);
         List<Class<?>> serializations = Arrays.asList(
                 job.getConfiguration().getClasses(CommonConfigurationKeys.IO_SERIALIZATIONS_KEY));
         if (serializations.indexOf(MultiSerializer.class) == -1) {

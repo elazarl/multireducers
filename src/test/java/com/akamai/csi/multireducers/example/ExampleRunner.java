@@ -1,6 +1,7 @@
 package com.akamai.csi.multireducers.example;
 
 import com.akamai.csi.multireducers.MultiJob;
+import com.akamai.csi.multireducers.MultiOutputFormat;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileContext;
@@ -56,13 +57,15 @@ public class ExampleRunner extends Configured implements Tool {
                 withMapper(SelectFirstField.class, Text.class, IntWritable.class).
                 withReducer(CountFirstField.class, numReduceTasks).
                 withCombiner(CountFirstField.class).
-                withOutputFormat(TextOutputFormat.class, Text.class, IntWritable.class, outputBaseDir + "/first").
+                withOutputFormat(TextOutputFormat.class, Text.class, IntWritable.class,
+                        MultiOutputFormat.outputPath(outputBaseDir + "/first")).
                 addTo(job);
         MultiJob.create().
                 withMapper(SelectSecondField.class, IntWritableInRange.class, IntWritable.class).
                 withReducer(CountSecondField.class, numReduceTasks).
                 withCombiner(CountSecondField.class).
-                withOutputFormat(TextOutputFormat.class, Text.class, IntWritable.class, outputBaseDir + "/second").
+                withOutputFormat(TextOutputFormat.class, Text.class, IntWritable.class,
+                        MultiOutputFormat.outputPath(outputBaseDir + "/second")).
                 addTo(job);
         job.setInputFormatClass(TextInputFormat.class);
         FileInputFormat.addInputPath(job, new Path(args[0]));
