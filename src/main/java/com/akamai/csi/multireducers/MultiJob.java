@@ -5,7 +5,6 @@ import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.mapreduce.*;
 import org.apache.hadoop.mapreduce.lib.output.LazyOutputFormat;
-import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
@@ -103,14 +102,11 @@ public class MultiJob {
             if (job.getConfiguration().getBoolean(DISABLE_JOB_PREFIX + reducer.getName(), false)) {
                 return false;
             }
-            int jobIndex = job.getConfiguration().getStringCollection(MultiMapper.CONF_KEY).size();
             if (!outputFormat.equals(NullOutputFormat.class)) {
                 job.getConfiguration().setBoolean(MULTIREDUCERS_HAVE_OUTPUT_FORMAT, true);
             }
             verifyJobIsSound();
-            ensureJobSet(job);
-            MultipleOutputs.addNamedOutput(job, namedOutputOf(reducer, jobIndex), outputFormat, outputFormatKey, outputFormatValue);
-            appendTo(job, OUTPUT_FORMAT_PATH, outputFormatPath);
+            MultiOutputFormat.addOutputFormat(job, outputFormat, outputFormatPath);
             appendTo(job, MultiMapper.CONF_KEY, mapper);
             appendTo(job, MultiReducer.CONF_KEY, reducer);
             appendTo(job, MultiPartitioner.NUM_REDUCERS_KEY, numReducers);
@@ -119,6 +115,7 @@ public class MultiJob {
             appendTo(job, MultiReducer.INPUT_KEY_CLASSES, mapperOutputKey);
             appendTo(job, MultiReducer.INPUT_VALUE_CLASSES, mapperOutputValue);
             appendTo(job, MultiComparator.CONF_KEY, comparator);
+            ensureJobSet(job);
             return true;
         }
 
@@ -222,10 +219,6 @@ public class MultiJob {
 
     }
 
-    public static String namedOutputOf(Class<? extends Reducer> reducer, int i) {
-        return reducer.getSimpleName() + "0" + i;
-    }
-
     private static void ensureJobSet(Job job) {
         if (job.getConfiguration().getBoolean(MULTIREDUCERS_HAVE_OUTPUT_FORMAT, false)) {
             // we need to use the TextOutputFormat, since otherwise the FileOutputCommitter won't run
@@ -240,6 +233,7 @@ public class MultiJob {
         job.setMapOutputValueClass(PerMapperOutputValue.class);
         job.setSortComparatorClass(MultiComparator.class);
         job.setPartitionerClass(MultiPartitioner.class);
+        job.setOutputFormatClass(MultiOutputFormat.class);
         List<Class<?>> serializations = Arrays.asList(
                 job.getConfiguration().getClasses(CommonConfigurationKeys.IO_SERIALIZATIONS_KEY));
         if (serializations.indexOf(MultiSerializer.class) == -1) {

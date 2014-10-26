@@ -4,10 +4,7 @@ import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Reducer;
-import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.apache.hadoop.mapreduce.lib.reduce.WrappedReducer;
 import org.apache.hadoop.util.ReflectionUtils;
 
@@ -51,7 +48,6 @@ public class MultiReducer<KEYOUT, VALUEOUT> extends Reducer<PerMapperOutputKey, 
     @Override
     protected void setup(final Context context) throws IOException, InterruptedException {
         Configuration conf = context.getConfiguration();
-        multipleOutputs = new MultipleOutputs<KEYOUT, VALUEOUT>(context);
         outputPaths = Lists.newArrayList(conf.getTrimmedStringCollection(MultiJob.OUTPUT_FORMAT_PATH));
         @SuppressWarnings("unchecked")
         Class<Reducer>[] reducersClass = (Class<Reducer>[]) conf.getClasses(conf_key());
@@ -66,19 +62,12 @@ public class MultiReducer<KEYOUT, VALUEOUT> extends Reducer<PerMapperOutputKey, 
         for (int i = 0; i < reducersClass.length; i++) {
             Class<Reducer> reducerClass = reducersClass[i];
             Reducer reducer = ReflectionUtils.newInstance(reducerClass, conf);
-            final String namedOutput = MultiJob.namedOutputOf(reducer.getClass(), i);
-            if (outputPaths.get(i).equals(MultiJob.NOPATH)) {
-                Path outputPath = FileOutputFormat.getOutputPath(context);
-                if (outputPath == null) {
-                    throw new IllegalArgumentException(outputPaths + ": Must set output path for job " + reducerClass + " " + i);
-                }
-                outputPaths.set(i, outputPath.toString());
-            }
-            final String outputPath = outputPaths.get(i) + "/" + namedOutput;
+
+            final int finalI = i;
             WrappedReducer.Context myContext = wrappedReducer.new Context(context) {
                 @Override
                 public void write(Object key, Object value) throws IOException, InterruptedException {
-                    multipleOutputs.write(namedOutput, key, value, outputPath);
+                    context.write((KEYOUT) new PerReducerOutputKey(finalI, key), (VALUEOUT)value);
                 }
             };
             contexts.add(myContext);
@@ -94,7 +83,6 @@ public class MultiReducer<KEYOUT, VALUEOUT> extends Reducer<PerMapperOutputKey, 
         for (int i = 0; i < reducers.size(); i++) {
             Methods.invoke(cleanups.get(i), reducers.get(i), getContextForReducer(context, i));
         }
-        multipleOutputs.close();
     }
 
     private List<Reducer> reducers;
@@ -102,6 +90,4 @@ public class MultiReducer<KEYOUT, VALUEOUT> extends Reducer<PerMapperOutputKey, 
     private List<Method> cleanups;
     private List<Reducer<PerMapperOutputKey, PerMapperOutputValue, KEYOUT, VALUEOUT>.Context> contexts;
     private List<String> outputPaths;
-
-    private MultipleOutputs multipleOutputs;
 }

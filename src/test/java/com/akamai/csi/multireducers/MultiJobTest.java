@@ -135,8 +135,8 @@ public class MultiJobTest {
         int exitCode = ToolRunner.run(new ExampleRunner(), new String[]{"file://" + input.getAbsolutePath(),
                 "file://" + output.getAbsolutePath()});
         assertThat(exitCode, is(0));
-        File[] firstFieldFiles = output.listFiles((FilenameFilter) new WildcardFileFilter("CountFirstField*"));
-        File[] secondFieldFiles = output.listFiles((FilenameFilter) new WildcardFileFilter("CountSecondField*"));
+        File[] firstFieldFiles = new File(output, "first").listFiles((FilenameFilter) new WildcardFileFilter("part-r-*"));
+        File[] secondFieldFiles = new File(output, "second").listFiles((FilenameFilter) new WildcardFileFilter("part-r-*"));
         assertThat(firstFieldFiles.length, is(1));
         assertThat(firstFieldFiles[0].length(), greaterThan(0l));
         assertThat(secondFieldFiles.length, is(1));

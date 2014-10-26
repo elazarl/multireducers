@@ -4,7 +4,9 @@ import com.akamai.csi.multireducers.example.ExampleRunner;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.ImmutableMultiset;
 import com.google.common.collect.Multiset;
-import com.google.common.io.*;
+import com.google.common.io.ByteStreams;
+import com.google.common.io.InputSupplier;
+import com.google.common.io.Resources;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -20,7 +22,6 @@ import java.util.EnumSet;
 import java.util.Properties;
 
 import static org.hamcrest.core.Is.is;
-import static org.hamcrest.core.IsNull.notNullValue;
 import static org.junit.Assert.assertThat;
 
 /**
@@ -55,29 +56,14 @@ public class MultiIT extends ClusterMapReduceTestCase {
         createInputFile(fc.create(inputFile, EnumSet.of(CreateFlag.CREATE)), times);
         assertThat(exampleRunner.run(new String[]{getTestRootDir() + inputFile.toString(), getTestRootDir() + getOutputDir().toString()}),
                 is(0));
-        RemoteIterator<FileStatus> it = fc.listStatus(new Path(getOutputDir(), "output"));
+        FileStatus[] first = fc.util().listStatus(new Path(getOutputDir(), "first"), new GlobFilter("part-r-*"));
+        FileStatus[] second = fc.util().listStatus(new Path(getOutputDir(), "second"), new GlobFilter("part-r-*"));
 
         Multiset<String> countFirst = HashMultiset.create();
         Multiset<String> countSecond = HashMultiset.create();
 
-        while (it.hasNext()) {
-            final Path path = it.next().getPath();
-            Multiset<String> map = MultiJobTest.toMap(new InputSupplier<InputStream>() {
-                @Override
-                public InputStream getInput() throws IOException {
-                    return fc.open(path);
-                }
-            });
-            if (path.getName().startsWith("CountFirst")) {
-                countFirst.addAll(map);
-            }
-            if (path.getName().startsWith("CountSecond")) {
-                countSecond.addAll(map);
-            }
-        }
-        assertThat(countFirst, notNullValue());
-        assertThat(countSecond, notNullValue());
-        assert(countFirst != null && countSecond != null);
+        fillMapFromFile(fc, first, countFirst);
+        fillMapFromFile(fc, second, countSecond);
 
         assertThat(ImmutableMultiset.copyOf(countFirst), is(new ImmutableMultiset.Builder<String>().
                 addCopies("john", 2 * times).
@@ -89,6 +75,18 @@ public class MultiIT extends ClusterMapReduceTestCase {
                 addCopies("130", 2*times).
                 addCopies("180", times).
                 addCopies("190", times).build()));
+    }
+
+    private void fillMapFromFile(final FileContext fc, FileStatus[] first, Multiset<String> countFirst) throws IOException {
+        for (final FileStatus status : first) {
+            Multiset<String> map = MultiJobTest.toMap(new InputSupplier<InputStream>() {
+                @Override
+                public InputStream getInput() throws IOException {
+                    return fc.open(status.getPath());
+                }
+            });
+            countFirst.addAll(map);
+        }
     }
 
     private void createInputFile(OutputStream out, int times) throws IOException {

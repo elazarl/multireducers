@@ -3,13 +3,14 @@ package com.akamai.csi.multireducers.example;
 import com.akamai.csi.multireducers.MultiJob;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
-import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -50,21 +51,23 @@ public class ExampleRunner extends Configured implements Tool {
     public int run(String[] args) throws Exception {
         Job job = new Job(getConf(), "ExampleMultiRunner");
         int numReduceTasks = job.getNumReduceTasks();
+        String outputBaseDir = args[1];
         MultiJob.create().
                 withMapper(SelectFirstField.class, Text.class, IntWritable.class).
                 withReducer(CountFirstField.class, numReduceTasks).
                 withCombiner(CountFirstField.class).
-                withOutputFormat(TextOutputFormat.class, Text.class, IntWritable.class).
+                withOutputFormat(TextOutputFormat.class, Text.class, IntWritable.class, outputBaseDir + "/first").
                 addTo(job);
         MultiJob.create().
                 withMapper(SelectSecondField.class, IntWritableInRange.class, IntWritable.class).
                 withReducer(CountSecondField.class, numReduceTasks).
                 withCombiner(CountSecondField.class).
-                withOutputFormat(TextOutputFormat.class, Text.class, IntWritable.class).
+                withOutputFormat(TextOutputFormat.class, Text.class, IntWritable.class, outputBaseDir + "/second").
                 addTo(job);
         job.setInputFormatClass(TextInputFormat.class);
         FileInputFormat.addInputPath(job, new Path(args[0]));
-        FileOutputFormat.setOutputPath(job, new Path(args[1]));
+        FileContext fc = FileContext.getFileContext(getConf());
+        fc.mkdir(new Path(outputBaseDir), FsPermission.getDefault(), true);
         return job.waitForCompletion(true) ? 0 : 1;
     }
 
