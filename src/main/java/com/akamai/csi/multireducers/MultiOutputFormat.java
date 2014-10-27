@@ -50,11 +50,11 @@ public class MultiOutputFormat<V> extends OutputFormat<PerReducerOutputKey, V> i
         outputFormats.add(outputFormat.getName());
         job.getConfiguration().setStrings(MULTI_OUTPUT_FORMATS, outputFormats.toArray(
                 new String[outputFormats.size()]));
-        List<String> outputPaths = Lists.newArrayList(
+        List<String> outputProps = Lists.newArrayList(
                 job.getConfiguration().getTrimmedStringCollection(MultiJob.OUTPUT_FORMAT_PROPERTIES));
-        outputPaths.add(MapToProperties.serialize(propertiesToMap(properties)));
+        outputProps.add(MapToProperties.serialize(propertiesToMap(properties)));
         job.getConfiguration().setStrings(MultiJob.OUTPUT_FORMAT_PROPERTIES,
-                outputPaths.toArray(new String[outputPaths.size()]));
+                outputProps.toArray(new String[outputProps.size()]));
     }
 
     @Override
@@ -141,10 +141,8 @@ public class MultiOutputFormat<V> extends OutputFormat<PerReducerOutputKey, V> i
     public void setConf(Configuration conf) {
         this.conf = conf;
         Class<?>[] outputFormatClasses = conf.getClasses(MULTI_OUTPUT_FORMATS);
-        List<String> serializedProperties = Lists.newArrayList(
-                conf.getTrimmedStringCollection(MultiJob.OUTPUT_FORMAT_PROPERTIES));
         outputProperties = Lists.newArrayList();
-        for (String serializedProperty : serializedProperties) {
+        for (String serializedProperty : conf.getTrimmedStringCollection(MultiJob.OUTPUT_FORMAT_PROPERTIES)) {
             outputProperties.add(MapToProperties.deserialize(serializedProperty));
         }
         outputFormats = new OutputFormat[outputFormatClasses.length];
