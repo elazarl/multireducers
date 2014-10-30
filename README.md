@@ -77,7 +77,7 @@ the example on the cluster with
 
 ```bash
 $ java -cp `hadoop classpath`:multireducers-0.1-SNAPSHOT.jar:multireducers-0.1-SNAPSHOT-tests.jar \
-com.akamai.csi.multireducers.example.ExampleRunner /input/file.txt /output/dir
+com.github.elazarl.multireducers.example.ExampleRunner /input/file.txt /output/dir
 ```
 
 Motivation
