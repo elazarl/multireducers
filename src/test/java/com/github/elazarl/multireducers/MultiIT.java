@@ -69,7 +69,11 @@ public class MultiIT extends ClusterMapReduceTestCase {
                 addCopies("john", 2 * times).
                 addCopies("dough", times).
                 addCopies("joe", times).
-                addCopies("moe", times).build()));
+                addCopies("moe", times).
+                addCopies("prefix_john", 2 * times).
+                addCopies("prefix_dough", times).
+                addCopies("prefix_joe", times).
+                addCopies("prefix_moe", times).build()));
         assertThat(ImmutableMultiset.copyOf(countSecond), is(new ImmutableMultiset.Builder<String>().
                 addCopies("120", times).
                 addCopies("130", 2*times).

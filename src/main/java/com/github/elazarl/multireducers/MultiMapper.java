@@ -39,9 +39,10 @@ public class MultiMapper<KEYIN, VALUEIN> extends Mapper<KEYIN, VALUEIN, PerMappe
         maps = new ArrayList<Method>(mappersClass.length);
         WrappedMapper wrappedMapper = new WrappedMapper();
         contexts = Lists.newArrayList();
+        int[] redirectToReducer = context.getConfiguration().getInts(MultiJob.REDIRECT_TO_REDUCER);
         for (int i = 0; i < mappersClass.length; i++) {
             Class<Mapper> mapperClass = mappersClass[i];
-            final int finalI = i;
+            final int finalI = redirectToReducer[i];
             WrappedMapper.Context myContext = wrappedMapper.new Context(context) {
                 @Override
                 public void write(Object k, Object v) throws IOException, InterruptedException {

@@ -53,12 +53,15 @@ public class ExampleRunner extends Configured implements Tool {
         Job job = new Job(getConf(), "ExampleMultiRunner");
         int numReduceTasks = job.getNumReduceTasks();
         String outputBaseDir = args[1];
-        MultiJob.create().
+        MultiJob.createWithId("first").
                 withMapper(SelectFirstField.class, Text.class, IntWritable.class).
                 withReducer(CountFirstField.class, numReduceTasks).
                 withCombiner(CountFirstField.class).
                 withOutputFormat(TextOutputFormat.class, Text.class, IntWritable.class,
                         MultiOutputFormat.outputPath(outputBaseDir + "/first")).
+                addTo(job);
+        MultiJob.create().withMapper(SelectFirstFieldWithPrefix.class, Text.class, IntWritable.class).
+                redirectReducerTo("first").
                 addTo(job);
         MultiJob.create().
                 withMapper(SelectSecondField.class, IntWritableInRange.class, IntWritable.class).

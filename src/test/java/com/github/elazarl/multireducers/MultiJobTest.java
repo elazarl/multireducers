@@ -147,7 +147,11 @@ public class MultiJobTest {
                 .addCopies("john", 2)
                 .add("dough")
                 .add("joe")
-                .add("moe").build()));
+                .add("moe")
+                .addCopies("prefix_john", 2)
+                .add("prefix_dough")
+                .add("prefix_joe")
+                .add("prefix_moe").build()));
         assertThat(ImmutableMultiset.copyOf(countSecondField), is(new ImmutableMultiset.Builder<String>()
                 .add("120")
                 .addCopies("130", 2)

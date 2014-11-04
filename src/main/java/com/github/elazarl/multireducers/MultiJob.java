@@ -23,9 +23,10 @@ public class MultiJob {
     public static final String MULTIREDUCERS_HAVE_OUTPUT_FORMAT = "com.github.elazarl.multireducers.have.output.format";
     public static final String OUTPUT_FORMAT_PATH = "com.github.elazarl.multireducers.outputFormatPath";
     public static final String OUTPUT_FORMAT_PROPERTIES = "com.github.elazarl.multireducers.outputFormat.properties";
-    public static final String NOPATH = "?nopath";
     public static final String DISABLE_JOB_PREFIX = "com.github.elazarl.multireducers.disable.job.";
     public static final String DISABLE_JOB_BY_INDEX_PREFIX = "com.github.elazarl.multireducers.disable.job.index.";
+    public static final String JOB_IDS_CONF_KEY = "com.github.elazarl.multireducers.job.ids";
+    public static final String REDIRECT_TO_REDUCER = "com.github.elazarl.multireducers.redirect.to.reducer";
 
     static public MultiJobBuilder create() {
         return new MultiJobBuilder();
@@ -48,6 +49,7 @@ public class MultiJob {
         private Class<?> mapperOutputKey;
         private Class<?> mapperOutputValue;
         private Class<? extends Reducer> reducer = Reducer.class;
+        private String redirectReducerToJobId;
         private int numReducers = 0;
         private Class<? extends Reducer> combiner = Reducer.class;
         private Class<? extends Partitioner> partitioner = HashPartitioner.class;
@@ -66,6 +68,11 @@ public class MultiJob {
             this.mapper = mapper;
             this.mapperOutputKey = outputKey;
             this.mapperOutputValue = outputValue;
+            return this;
+        }
+
+        public MultiJobBuilder redirectReducerTo(String jobId) {
+            this.redirectReducerToJobId = jobId;
             return this;
         }
 
@@ -115,8 +122,22 @@ public class MultiJob {
             verifyJobIsSound();
             MultiOutputFormat.addOutputFormat(job, outputFormat, outputFormatProperties.toArray(
                     new MultiOutputFormat.Property[outputFormatProperties.size()]));
+            appendTo(job, JOB_IDS_CONF_KEY, id);
             appendTo(job, MultiMapper.CONF_KEY, mapper);
-            appendTo(job, MultiReducer.CONF_KEY, reducer);
+            if (redirectReducerToJobId != null) {
+                appendTo(job, MultiReducer.CONF_KEY, NopReducer.class);
+                List<String> ids = Lists.newArrayList(
+                        job.getConfiguration().getTrimmedStringCollection(JOB_IDS_CONF_KEY));
+                int i = ids.indexOf(redirectReducerToJobId);
+                if (i == -1) {
+                    throw new IllegalArgumentException("Cannot find job ID of " + redirectReducerToJobId +
+                            " have " + ids);
+                }
+                appendTo(job, REDIRECT_TO_REDUCER, i);
+            } else {
+                appendTo(job, MultiReducer.CONF_KEY, reducer);
+                appendTo(job, REDIRECT_TO_REDUCER, jobIndex);
+            }
             appendTo(job, MultiPartitioner.NUM_REDUCERS_KEY, numReducers);
             appendTo(job, MultiCombiner.CONF_KEY, combiner);
             appendTo(job, MultiPartitioner.CONF_KEY, partitioner);
